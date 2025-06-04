@@ -74,7 +74,7 @@ For the bias:
 2. **Calculate u:**
     
     ```
-        u = (0*0.09) + (0*0.2) + (1*0.09) + 0.09
+    u = (0*0.09) + (0*0.2) + (1*0.09) + 0.09
     u = 0 + 0 + 0.09 + 0.09 = 0.18
     ```
     
@@ -94,9 +94,9 @@ For the bias:
 
 The network correctly classified this sample, so no learning adjustment is needed for this step.
     
-    ```
+    
     w_new = w_old + η * 0 * x = w_old
-    ```
+    
     
 
 ...This process continues for all training samples, for multiple epochs until the perceptron converges or reaches maximum iterations.
