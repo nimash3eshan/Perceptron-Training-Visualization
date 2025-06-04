@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perceptron Training Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border: 2px solid #e9ecef;
+        }
+        
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            border-radius: 10px;
+            color: white;
+        }
+        
+        button {
+            background: #2d3436;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            margin: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #636e72;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .step-info {
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+        
+        .math-display {
+            background: #2d3436;
+            color: #74b9ff;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            margin: 10px 0;
+            border-left: 4px solid #74b9ff;
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: linear-gradient(45deg, #00b894, #00a085);
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .highlight {
+            background: #ffeaa7 !important;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Perceptron Training Visualization</h1>
+        
+        <div class="controls">
+            <button onclick="runTrainingStep()">Step Through Training</button>
+            <button onclick="runFullTraining()">Run Complete Training</button>
+            <button onclick="resetTraining()">Reset</button>
+        </div>
+        
+        <div class="step-info" id="stepInfo">
+            Ready to start training! Click "Step Through Training" to see each iteration.
+        </div>
+        
+        <div class="data-table">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Sample</th>
+                        <th>x₁</th>
+                        <th>x₂</th>
+                        <th>x₃</th>
+                        <th>Target (y)</th>
+                        <th>Predicted (ŷ)</th>
+                        <th>Error (e)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="grid">
+            <div class="chart-container">
+                <div class="chart-title">Weight Evolution During Training</div>
+                <canvas id="weightsChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Error Pattern Across Samples</div>
+                <canvas id="errorChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Decision Boundary Visualization</div>
+                <canvas id="boundaryChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Training Progress (Accuracy)</div>
+                <canvas id="accuracyChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="math-display" id="mathDisplay">
+            Mathematical calculations will appear here during training...
+        </div>
+    </div>
+
+    <script>
+        // Training data
+        const trainingData = [
+            {x1: 1, x2: 0, x3: 1, target: 0},
+            {x1: 0, x2: 0, x3: 1, target: 1},
+            {x1: 1, x2: 1, x3: 0, target: 0},
+            {x1: 0, x2: 1, x3: 1, target: 1},
+            {x1: 1, x2: 0, x3: 0, target: 0},
+            {x1: 0, x2: 1, x3: 0, target: 1}
+        ];
+        
+        // Perceptron parameters
+        let weights = {w1: 0.1, w2: 0.2, w3: 0.1, bias: 0.1};
+        let learningRate = 0.01;
+        let currentStep = 0;
+        let currentEpoch = 0;
+        let trainingHistory = [];
+        let weightHistory = [];
+        let errorHistory = [];
+        let accuracyHistory = [];
+        
+        // Chart instances
+        let weightsChart, errorChart, boundaryChart, accuracyChart;
+        
+        // Heaviside activation function
+        function heaviside(x) {
+            return x >= 0 ? 1 : 0;
+        }
+        
+        // Calculate perceptron output
+        function calculateOutput(sample) {
+            const u = sample.x1 * weights.w1 + sample.x2 * weights.w2 + sample.x3 * weights.w3 + weights.bias;
+            return {
+                u: u,
+                output: heaviside(u)
+            };
+        }
+        
+        // Update weights based on error
+        function updateWeights(sample, error) {
+            const oldWeights = {...weights};
+            weights.w1 += learningRate * error * sample.x1;
+            weights.w2 += learningRate * error * sample.x2;
+            weights.w3 += learningRate * error * sample.x3;
+            weights.bias += learningRate * error * 1;
+            
+            return {
+                old: oldWeights,
+                new: {...weights},
+                changes: {
+                    w1: learningRate * error * sample.x1,
+                    w2: learningRate * error * sample.x2,
+                    w3: learningRate * error * sample.x3,
+                    bias: learningRate * error * 1
+                }
+            };
+        }
+        
+        // Calculate accuracy
+        function calculateAccuracy() {
+            let correct = 0;
+            trainingData.forEach(sample => {
+                const result = calculateOutput(sample);
+                if (result.output === sample.target) correct++;
+            });
+            return (correct / trainingData.length) * 100;
+        }
+        
+        // Initialize charts
+        function initializeCharts() {
+            // Weights chart
+            const weightsCtx = document.getElementById('weightsChart').getContext('2d');
+            weightsChart = new Chart(weightsCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'w₁',
+                            data: [],
+                            borderColor: '#e17055',
+                            backgroundColor: 'rgba(225, 112, 85, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'w₂',
+                            data: [],
+                            borderColor: '#74b9ff',
+                            backgroundColor: 'rgba(116, 185, 255, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'w₃',
+                            data: [],
+                            borderColor: '#00b894',
+                            backgroundColor: 'rgba(0, 184, 148, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'bias',
+                            data: [],
+                            borderColor: '#fdcb6e',
+                            backgroundColor: 'rgba(253, 203, 110, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+            
+            // Error chart - Fixed the dynamic background color issue
+            const errorCtx = document.getElementById('errorChart').getContext('2d');
+            errorChart = new Chart(errorCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Error',
+                        data: [],
+                        backgroundColor: '#74b9ff',
+                        borderColor: '#2d3436',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            min: -1.5,
+                            max: 1.5
+                        }
+                    }
+                }
+            });
+            
+            // Accuracy chart
+            const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
+            accuracyChart = new Chart(accuracyCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Accuracy (%)',
+                        data: [],
+                        borderColor: '#00b894',
+                        backgroundColor: 'rgba(0, 184, 148, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+            
+            // Decision boundary chart (simplified 2D projection)
+            const boundaryCtx = document.getElementById('boundaryChart').getContext('2d');
+            boundaryChart = new Chart(boundaryCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Class 0',
+                            data: [],
+                            backgroundColor: '#e17055',
+                            pointRadius: 8
+                        },
+                        {
+                            label: 'Class 1',
+                            data: [],
+                            backgroundColor: '#00b894',
+                            pointRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'x₁ + x₃ (Feature Combination)'
+                            },
+                            min: -0.5,
+                            max: 2.5
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'x₂'
+                            },
+                            min: -0.5,
+                            max: 1.5
+                        }
+                    }
+                }
+            });
+            
+            updateBoundaryChart();
+        }
+        
+        // Update boundary chart
+        function updateBoundaryChart() {
+            const class0 = [];
+            const class1 = [];
+            
+            trainingData.forEach(sample => {
+                const point = {
+                    x: sample.x1 + sample.x3, // Combine x1 and x3 for 2D visualization
+                    y: sample.x2
+                };
+                
+                if (sample.target === 0) {
+                    class0.push(point);
+                } else {
+                    class1.push(point);
+                }
+            });
+            
+            boundaryChart.data.datasets[0].data = class0;
+            boundaryChart.data.datasets[1].data = class1;
+            boundaryChart.update();
+        }
+        
+        // Update data table
+        function updateDataTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            
+            trainingData.forEach((sample, index) => {
+                const result = calculateOutput(sample);
+                const error = sample.target - result.output;
+                const row = tbody.insertRow();
+                
+                if (index === currentStep % trainingData.length && currentStep > 0) {
+                    row.classList.add('highlight');
+                }
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${sample.x1}</td>
+                    <td>${sample.x2}</td>
+                    <td>${sample.x3}</td>
+                    <td>${sample.target}</td>
+                    <td>${result.output}</td>
+                    <td>${error}</td>
+                    <td>${error === 0 ? '✅ Correct' : '❌ Wrong'}</td>
+                `;
+            });
+        }
+        
+        // Run one training step
+        function runTrainingStep() {
+            if (currentStep >= trainingData.length * 10) { // Limit to 10 epochs
+                document.getElementById('stepInfo').innerHTML = "Training completed! The perceptron has learned the pattern.";
+                return;
+            }
+            
+            const sampleIndex = currentStep % trainingData.length;
+            const sample = trainingData[sampleIndex];
+            
+            // Calculate output
+            const result = calculateOutput(sample);
+            const error = sample.target - result.output;
+            
+            // Update display
+            document.getElementById('stepInfo').innerHTML = `
+                <strong>Step ${currentStep + 1} - Sample ${sampleIndex + 1}</strong><br>
+                Input: [${sample.x1}, ${sample.x2}, ${sample.x3}] → Target: ${sample.target}<br>
+                Calculated u = ${result.u.toFixed(3)}, Output: ${result.output}<br>
+                Error: ${error} ${error === 0 ? '(No update needed!)' : '(Weights will be updated)'}
+            `;
+            
+            // Update math display
+            const mathDisplay = document.getElementById('mathDisplay');
+            if (error !== 0) {
+                const weightUpdate = updateWeights(sample, error);
+                mathDisplay.innerHTML = `
+                    u = ${sample.x1}×${weightUpdate.old.w1.toFixed(3)} + ${sample.x2}×${weightUpdate.old.w2.toFixed(3)} + ${sample.x3}×${weightUpdate.old.w3.toFixed(3)} + ${weightUpdate.old.bias.toFixed(3)} = ${result.u.toFixed(3)}<br>
+                    ŷ = Heaviside(${result.u.toFixed(3)}) = ${result.output}<br>
+                    e = ${sample.target} - ${result.output} = ${error}<br><br>
+                    Weight Updates:<br>
+                    w₁: ${weightUpdate.old.w1.toFixed(3)} + ${learningRate}×${error}×${sample.x1} = ${weightUpdate.new.w1.toFixed(3)}<br>
+                    w₂: ${weightUpdate.old.w2.toFixed(3)} + ${learningRate}×${error}×${sample.x2} = ${weightUpdate.new.w2.toFixed(3)}<br>
+                    w₃: ${weightUpdate.old.w3.toFixed(3)} + ${learningRate}×${error}×${sample.x3} = ${weightUpdate.new.w3.toFixed(3)}<br>
+                    bias: ${weightUpdate.old.bias.toFixed(3)} + ${learningRate}×${error}×1 = ${weightUpdate.new.bias.toFixed(3)}
+                `;
+            } else {
+                mathDisplay.innerHTML = `
+                    u = ${sample.x1}×${weights.w1.toFixed(3)} + ${sample.x2}×${weights.w2.toFixed(3)} + ${sample.x3}×${weights.w3.toFixed(3)} + ${weights.bias.toFixed(3)} = ${result.u.toFixed(3)}<br>
+                    ŷ = Heaviside(${result.u.toFixed(3)}) = ${result.output}<br>
+                    e = ${sample.target} - ${result.output} = ${error}<br><br>
+                    No error - weights remain unchanged! 🎯
+                `;
+            }
+            
+            // Update weights if there's an error
+            if (error !== 0) {
+                updateWeights(sample, error);
+            }
+            
+            // Record history
+            weightHistory.push({
+                step: currentStep,
+                w1: weights.w1,
+                w2: weights.w2,
+                w3: weights.w3,
+                bias: weights.bias
+            });
+            
+            errorHistory.push({
+                step: currentStep,
+                sample: sampleIndex + 1,
+                error: error
+            });
+            
+            // Update charts
+            if (sampleIndex === trainingData.length - 1) {
+                const accuracy = calculateAccuracy();
+                accuracyHistory.push({
+                    epoch: currentEpoch,
+                    accuracy: accuracy
+                });
+                currentEpoch++;
+            }
+            
+            updateCharts();
+            updateDataTable();
+            
+            currentStep++;
+        }
+        
+        // Update all charts
+        function updateCharts() {
+            // Update weights chart
+            weightsChart.data.labels = weightHistory.map(h => `Step ${h.step + 1}`);
+            weightsChart.data.datasets[0].data = weightHistory.map(h => h.w1);
+            weightsChart.data.datasets[1].data = weightHistory.map(h => h.w2);
+            weightsChart.data.datasets[2].data = weightHistory.map(h => h.w3);
+            weightsChart.data.datasets[3].data = weightHistory.map(h => h.bias);
+            weightsChart.update();
+            
+            // Update error chart - with proper color coding
+            const recentErrors = errorHistory.slice(-6);
+            errorChart.data.labels = recentErrors.map(h => `S${h.sample}`);
+            
+            // Update background colors based on error values
+            const backgroundColors = recentErrors.map(h => {
+                if (h.error > 0) return '#00b894'; // Green for positive error
+                if (h.error < 0) return '#e17055'; // Red for negative error
+                return '#74b9ff'; // Blue for no error
+            });
+            
+            errorChart.data.datasets[0].data = recentErrors.map(h => h.error);
+            errorChart.data.datasets[0].backgroundColor = backgroundColors;
+            errorChart.update();
+            
+            // Update accuracy chart
+            if (accuracyHistory.length > 0) {
+                accuracyChart.data.labels = accuracyHistory.map(h => `Epoch ${h.epoch + 1}`);
+                accuracyChart.data.datasets[0].data = accuracyHistory.map(h => h.accuracy);
+                accuracyChart.update();
+            }
+        }
+        
+        // Run full training
+        function runFullTraining() {
+            while (currentStep < trainingData.length * 10 && calculateAccuracy() < 100) {
+                runTrainingStep();
+            }
+        }
+        
+        // Reset training
+        function resetTraining() {
+            weights = {w1: 0.1, w2: 0.2, w3: 0.1, bias: 0.1};
+            currentStep = 0;
+            currentEpoch = 0;
+            trainingHistory = [];
+            weightHistory = [];
+            errorHistory = [];
+            accuracyHistory = [];
+            
+            // Clear charts
+            weightsChart.data.labels = [];
+            weightsChart.data.datasets.forEach(dataset => dataset.data = []);
+            weightsChart.update();
+            
+            errorChart.data.labels = [];
+            errorChart.data.datasets[0].data = [];
+            errorChart.data.datasets[0].backgroundColor = '#74b9ff';
+            errorChart.update();
+            
+            accuracyChart.data.labels = [];
+            accuracyChart.data.datasets[0].data = [];
+            accuracyChart.update();
+            
+            updateDataTable();
+            
+            document.getElementById('stepInfo').innerHTML = "Training reset! Ready to start again.";
+            document.getElementById('mathDisplay').innerHTML = "Mathematical calculations will appear here during training...";
+        }
+        
+        // Initialize everything when page loads
+        window.onload = function() {
+            initializeCharts();
+            updateDataTable();
+        };
+    </script>
+</body>
+</html>
